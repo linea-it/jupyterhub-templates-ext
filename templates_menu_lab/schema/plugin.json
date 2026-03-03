@@ -1,6 +1,6 @@
 {
-  "title": "Templates Menu",
-  "description": "Menu 'Templates' na barra superior para criar notebooks a partir de templates (adicionado por código).",
+  "title": "linea-tutorials-menu",
+  "description": "Menu Tutorials na barra superior do JupyterLab para criar notebooks a partir de tutoriais (Linea).",
   "type": "object",
   "additionalProperties": false
 }

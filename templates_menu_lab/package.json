@@ -1,8 +1,8 @@
 {
-  "name": "templates-menu-lab",
+  "name": "linea-tutorials-menu",
   "version": "0.1.0",
-  "description": "Templates menu in JupyterLab top bar (no jupyterlab_templates).",
-  "keywords": ["jupyter", "jupyterlab", "jupyterlab-extension", "templates"],
+  "description": "Tutorials menu in JupyterLab top bar (Linea).",
+  "keywords": ["jupyter", "jupyterlab", "jupyterlab-extension", "tutorials", "linea"],
   "files": [
     "lib/**/*.{d.ts,js}",
     "style/**/*.{css,js}",
@@ -20,6 +20,7 @@
   "dependencies": {
     "@jupyterlab/application": "^4.0.0",
     "@jupyterlab/apputils": "^4.0.0",
+    "@jupyterlab/filebrowser": "^4.0.0",
     "@jupyterlab/mainmenu": "^4.0.0",
     "@jupyterlab/translation": "^4.0.0",
     "@lumino/widgets": "^2.0.0"

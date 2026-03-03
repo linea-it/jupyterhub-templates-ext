@@ -1,5 +1,6 @@
 /**
- * Templates menu: "Templates" na barra com submenus por pasta; cada item cria e abre o notebook.
+ * Tutorials menu: submenus por pasta; cada item cria e abre o notebook.
+ * O notebook é criado na pasta atualmente aberta no navegador de ficheiros (se disponível).
  * API: /templates-menu/templates e /templates-menu/create.
  */
 
@@ -8,6 +9,7 @@ import {
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
 import { ICommandPalette } from '@jupyterlab/apputils';
+import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { IMainMenu } from '@jupyterlab/mainmenu';
 import { PageConfig } from '@jupyterlab/coreutils';
 import { Menu } from '@lumino/widgets';
@@ -80,44 +82,54 @@ function folderLabel(folder: string): string {
     .replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/** Obtém o diretório atual do navegador de ficheiros (pasta aberta à esquerda), ou '' para a raiz. */
+function getFileBrowserCwd(fileBrowserFactory: IFileBrowserFactory | null): string {
+  if (!fileBrowserFactory?.tracker?.currentWidget?.model) return '';
+  const path = fileBrowserFactory.tracker.currentWidget.model.path;
+  return typeof path === 'string' ? path : '';
+}
+
 const plugin: JupyterFrontEndPlugin<void> = {
-  id: 'templates-menu-lab:plugin',
-  description: 'Menu "Templates" com submenus por pasta; cada item cria e abre o notebook.',
+  id: 'linea-tutorials-menu:plugin',
+  description: 'Menu "Tutorials" com submenus por pasta; cada item cria e abre o notebook.',
   autoStart: true,
-  optional: [IMainMenu, ICommandPalette],
+  optional: [IMainMenu, ICommandPalette, IFileBrowserFactory],
   activate: (
     app: JupyterFrontEnd,
     mainMenu: IMainMenu | null,
-    palette: ICommandPalette | null
+    palette: ICommandPalette | null,
+    fileBrowserFactory: IFileBrowserFactory | null
   ) => {
     const { commands } = app;
 
     commands.addCommand(CMD_CREATE_FROM, {
       label: (args: { template_label?: string }) =>
-        args.template_label ?? 'Novo a partir de template',
+        args.template_label ?? 'Novo a partir de tutorial',
       execute: async (args: { template_id?: string }) => {
         const templateId = args.template_id;
         if (!templateId) return;
         try {
-          const { path } = await createFromTemplate(templateId, '');
+          const cwd = getFileBrowserCwd(fileBrowserFactory);
+          const { path } = await createFromTemplate(templateId, cwd);
+          const pathToOpen = cwd ? `${cwd.replace(/\/$/, '')}/${path}` : path;
           await app.commands.execute('docmanager:open', {
-            path: path.startsWith('/') ? path.slice(1) : path
+            path: pathToOpen.startsWith('/') ? pathToOpen.slice(1) : pathToOpen
           });
         } catch (e) {
-          console.error('Templates menu create:', e);
+          console.error('Tutorials menu create:', e);
           alert(`Erro ao criar notebook: ${(e as Error).message}`);
         }
       }
     });
 
     if (palette) {
-      palette.addItem({ command: CMD_CREATE_FROM, category: 'Templates' });
+      palette.addItem({ command: CMD_CREATE_FROM, category: 'Tutorials' });
     }
 
     if (mainMenu) {
       const topMenu = new Menu({ commands });
-      topMenu.title.label = 'Templates';
-      topMenu.id = 'jp-mainmenu-templates-menu';
+      topMenu.title.label = 'Tutorials';
+      topMenu.id = 'jp-mainmenu-tutorials-menu';
 
       // Menu sempre visível; itens preenchidos quando a API responder (lista vazia ou erro = menu sem itens)
       mainMenu.addMenu(topMenu, true, { rank: 80 });
