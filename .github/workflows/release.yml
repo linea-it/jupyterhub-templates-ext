@@ -1,0 +1,161 @@
+# Build wheel: em release (anexa ao Release), em push para main ou manual (artefato).
+name: Build wheel
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: false
+        default: 'main'
+
+jobs:
+  build-wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: templates_menu_lab/package.json
+
+      - name: Install npm dependencies (lab extension)
+        run: |
+          cd templates_menu_lab
+          npm ci 2>/dev/null || npm install
+          cd ..
+
+      - name: Install Python build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build hatchling hatch-jupyter-builder jupyterlab
+
+      - name: Build lab extension (gera templates_menu_lab/labextension)
+        run: |
+          cd templates_menu_lab
+          npm run build:lib
+          jupyter labextension build .
+          cd ..
+
+      # Obrigatório: frontend tem de existir para shared-data empacotar no wheel
+      - name: Garantir que o frontend foi gerado
+        run: |
+          LAB="templates_menu_lab/labextension"
+          if [ ! -f "$LAB/package.json" ]; then
+            echo "::error::$LAB/package.json não existe; lab extension não foi buildada."
+            exit 1
+          fi
+          if [ ! -d "$LAB/static" ] || [ -z "$(find "$LAB/static" -type f 2>/dev/null)" ]; then
+            echo "::error::$LAB/static/ vazio ou ausente; frontend (menu) não foi compilado."
+            exit 1
+          fi
+          echo "Frontend gerado: $LAB/package.json e $LAB/static/*"
+
+      # Garantir que o pyproject mapeia labextension para share/jupyter (obrigatório para prefix correto)
+      - name: Verificar shared-data no pyproject (share/jupyter)
+        run: |
+          if ! grep -q 'share/jupyter/labextensions/templates-menu-lab' pyproject.toml; then
+            echo "::error::pyproject.toml deve mapear labextension para share/jupyter/... (tool.hatch.build.targets.wheel.shared-data)"
+            grep -A5 'shared-data' pyproject.toml || true
+            exit 1
+          fi
+          echo "OK: shared-data usa share/jupyter/..."
+
+      # shared-data no pyproject: só labextension (templates apontados localmente na instalação)
+      - name: Build wheel (frontend)
+        run: python -m build --wheel --outdir dist/ --no-isolation
+
+      # Nível 1: conteúdo do wheel — labextension em share/jupyter/... (não em jupyter/ sem share)
+      - name: Validar paths no wheel (share/jupyter/...)
+        run: |
+          python - <<'PY'
+          import zipfile, glob, sys
+          wheels = sorted(glob.glob('dist/*.whl'))
+          if not wheels:
+            print("::error::Nenhum .whl em dist/")
+            sys.exit(1)
+          w = wheels[-1]
+          z = zipfile.ZipFile(w)
+          names = z.namelist()
+          # No .whl os paths são *.data/data/share/jupyter/...; ao instalar vão para prefix/share/...
+          lab_paths = [n for n in names if "labextensions/templates-menu-lab" in n]
+          ok_share = any("share" in n and "jupyter/labextensions/templates-menu-lab" in n for n in names)
+          # Paths da labextension devem conter "share" (ex.: .../data/share/jupyter/...)
+          bad_prefix = any("share" not in n for n in lab_paths)
+          print("Wheel:", w)
+          print("share + labextensions/templates-menu-lab =>", ok_share)
+          print("labextension sem /share/ no path =>", bad_prefix)
+          if lab_paths and not ok_share:
+            print("Paths labextension (amostra):", lab_paths[:3])
+          if not ok_share or bad_prefix:
+            sys.exit(1)
+          paths = sorted([n for n in names if "labextensions/templates-menu-lab" in n])
+          print("Total labextension files:", len(paths))
+          for p in paths[:12]:
+            print(" ", p)
+          # CSS (menu clicável, z-index) está nos chunks .js, não em style.js; verificar em todo o static
+          static_js = [n for n in names if "labextensions/templates-menu-lab/static/" in n and n.endswith(".js")]
+          combined = b"".join(z.read(n) for n in static_js).decode("utf-8", errors="ignore")
+          for k in ["jp-mainmenu-templates-menu", "pointer-events", "z-index"]:
+            ok = k in combined
+            print("CSS", k, "=>", ok)
+            if not ok:
+              sys.exit(1)
+          print("OK: paths e CSS no wheel válidos.")
+          PY
+
+      # Nível 2: instalação em venv — labextension em prefix/share/jupyter/labextensions/
+      - name: Validar instalação (venv)
+        run: |
+          python -m venv .venv-test
+          . .venv-test/bin/activate
+          pip install --quiet dist/*.whl jupyterlab
+          python - <<'PY'
+          import sys, site, os
+          prefix = sys.prefix
+          sp = site.getsitepackages()[0]
+          cands = [
+              (f"{prefix}/share/jupyter/labextensions/templates-menu-lab", "prefix/share/..."),
+              (f"{prefix}/jupyter/labextensions/templates-menu-lab", "prefix/jupyter/... (indesejado)"),
+              (f"{sp}/share/jupyter/labextensions/templates-menu-lab", "site-packages/share/..."),
+          ]
+          for path, label in cands:
+            exists = os.path.isdir(path)
+            print(label, "=>", exists)
+          expected = cands[0][0]
+          if not os.path.isdir(expected):
+            print("::error::Labextension não está em prefix/share/jupyter/labextensions/")
+            sys.exit(1)
+          PY
+          jupyter labextension list 2>&1 | grep -q templates-menu-lab || (echo "::error::templates-menu-lab não em labextension list" && exit 1)
+          echo "OK: instalação e labextension list válidos."
+
+      - name: Upload .whl to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.whl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload .whl as artifact
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ github.sha }}
+          path: dist/*.whl
