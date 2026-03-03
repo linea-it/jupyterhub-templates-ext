@@ -24,7 +24,7 @@ packages = ["templates_menu"]
 [tool.hatch.build.targets.wheel.shared-data]
 # Instala em prefix/share/jupyter/... (evita site-packages ou prefix/jupyter/...)
 # Templates não vêm no wheel: apontar JUPYTER_TEMPLATES_DIR na instalação (ex.: /opt/notebook-templates)
-"templates_menu_lab/labextension/" = "share/jupyter/labextensions/templates-menu-lab/"
+"templates_menu_lab/labextension/" = "share/jupyter/labextensions/linea-tutorials-menu/"
 
 [tool.hatch.build.targets.sdist]
 include = [

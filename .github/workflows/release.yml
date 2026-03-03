@@ -69,7 +69,7 @@ jobs:
       # Garantir que o pyproject mapeia labextension para share/jupyter (obrigatório para prefix correto)
       - name: Verificar shared-data no pyproject (share/jupyter)
         run: |
-          if ! grep -q 'share/jupyter/labextensions/templates-menu-lab' pyproject.toml; then
+          if ! grep -q 'share/jupyter/labextensions/linea-tutorials-menu' pyproject.toml; then
             echo "::error::pyproject.toml deve mapear labextension para share/jupyter/... (tool.hatch.build.targets.wheel.shared-data)"
             grep -A5 'shared-data' pyproject.toml || true
             exit 1
@@ -93,25 +93,25 @@ jobs:
           z = zipfile.ZipFile(w)
           names = z.namelist()
           # No .whl os paths são *.data/data/share/jupyter/...; ao instalar vão para prefix/share/...
-          lab_paths = [n for n in names if "labextensions/templates-menu-lab" in n]
-          ok_share = any("share" in n and "jupyter/labextensions/templates-menu-lab" in n for n in names)
+          lab_paths = [n for n in names if "labextensions/linea-tutorials-menu" in n]
+          ok_share = any("share" in n and "jupyter/labextensions/linea-tutorials-menu" in n for n in names)
           # Paths da labextension devem conter "share" (ex.: .../data/share/jupyter/...)
           bad_prefix = any("share" not in n for n in lab_paths)
           print("Wheel:", w)
-          print("share + labextensions/templates-menu-lab =>", ok_share)
+          print("share + labextensions/linea-tutorials-menu =>", ok_share)
           print("labextension sem /share/ no path =>", bad_prefix)
           if lab_paths and not ok_share:
             print("Paths labextension (amostra):", lab_paths[:3])
           if not ok_share or bad_prefix:
             sys.exit(1)
-          paths = sorted([n for n in names if "labextensions/templates-menu-lab" in n])
+          paths = sorted([n for n in names if "labextensions/linea-tutorials-menu" in n])
           print("Total labextension files:", len(paths))
           for p in paths[:12]:
             print(" ", p)
           # CSS (menu clicável, z-index) está nos chunks .js, não em style.js; verificar em todo o static
-          static_js = [n for n in names if "labextensions/templates-menu-lab/static/" in n and n.endswith(".js")]
+          static_js = [n for n in names if "labextensions/linea-tutorials-menu/static/" in n and n.endswith(".js")]
           combined = b"".join(z.read(n) for n in static_js).decode("utf-8", errors="ignore")
-          for k in ["jp-mainmenu-templates-menu", "pointer-events", "z-index"]:
+          for k in ["jp-mainmenu-tutorials-menu", "pointer-events", "z-index"]:
             ok = k in combined
             print("CSS", k, "=>", ok)
             if not ok:
@@ -130,9 +130,9 @@ jobs:
           prefix = sys.prefix
           sp = site.getsitepackages()[0]
           cands = [
-              (f"{prefix}/share/jupyter/labextensions/templates-menu-lab", "prefix/share/..."),
-              (f"{prefix}/jupyter/labextensions/templates-menu-lab", "prefix/jupyter/... (indesejado)"),
-              (f"{sp}/share/jupyter/labextensions/templates-menu-lab", "site-packages/share/..."),
+              (f"{prefix}/share/jupyter/labextensions/linea-tutorials-menu", "prefix/share/..."),
+              (f"{prefix}/jupyter/labextensions/linea-tutorials-menu", "prefix/jupyter/... (indesejado)"),
+              (f"{sp}/share/jupyter/labextensions/linea-tutorials-menu", "site-packages/share/..."),
           ]
           for path, label in cands:
             exists = os.path.isdir(path)
@@ -142,7 +142,7 @@ jobs:
             print("::error::Labextension não está em prefix/share/jupyter/labextensions/")
             sys.exit(1)
           PY
-          jupyter labextension list 2>&1 | grep -q templates-menu-lab || (echo "::error::templates-menu-lab não em labextension list" && exit 1)
+          jupyter labextension list 2>&1 | grep -q linea-tutorials-menu || (echo "::error::linea-tutorials-menu não em labextension list" && exit 1)
           echo "OK: instalação e labextension list válidos."
 
       - name: Upload .whl to Release
