@@ -1,12 +1,12 @@
 /* Styles for linea-tutorials-menu (optional) */
 
-/* Garante que o menu "Templates" e o dropdown sejam clicáveis e fiquem acima de overlays */
-#jp-mainmenu-templates-menu {
+/* Garante que o menu "Tutorials" e o dropdown sejam clicáveis e fiquem acima de overlays */
+#jp-mainmenu-tutorials-menu {
   pointer-events: auto !important;
   cursor: pointer !important;
 }
-#jp-mainmenu-templates-menu .p-MenuBar-item,
-#jp-mainmenu-templates-menu .lm-MenuBar-item {
+#jp-mainmenu-tutorials-menu .p-MenuBar-item,
+#jp-mainmenu-tutorials-menu .lm-MenuBar-item {
   pointer-events: auto !important;
   cursor: pointer !important;
 }
